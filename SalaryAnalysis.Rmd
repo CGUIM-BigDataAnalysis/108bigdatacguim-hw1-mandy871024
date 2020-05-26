@@ -1,7 +1,7 @@
 ---
 title: "108-2 大數據分析方法 作業一"
 output: github_document
-author: put your name here
+author: 黃敏淳 B0644017
 ---
 
 搞不清楚各行各業的薪資差異嗎? 念研究所到底對第一份工作的薪資影響有多大? CP值高嗎? 透過分析**初任人員平均經常性薪資**- （107年）https://data.gov.tw/dataset/6647 （104-105年）http://ipgod.nchc.org.tw/dataset/a17000000j-020066 ，可初步了解台灣近幾年各行各業、各學歷的起薪。
@@ -12,22 +12,61 @@ author: put your name here
 ```{r dataload}
 library(readr)
 library(dplyr)
-
+library(knitr)
+#匯入資料
+salary104<-read_csv("http://ipgod.nchc.org.tw/dataset/b6f36b72-0c4a-4b60-9254-1904e180ddb1/resource/98d5094d-7481-44b5-876a-715a496f922c/download/a17000000j-020066-mah.csv")
+knitr::kable(head(salary104))
+salary107<-read_csv("/Users/Mandy/Desktop/107年各教育程度別初任人員.csv")
+knitr::kable(head(salary107))
+#把104和107資料裡職業名稱統一
+salary104$大職業別<-gsub("部門","",salary104$大職業別)
+salary104$大職業別<-gsub("、","_",salary104$大職業別)
+salary107$大職業別<-gsub("營建工程","營造業",salary107$大職業別)
+salary107$大職業別<-gsub("出版、影音製作、傳播及資通訊服務業","資訊及通訊傳播業",salary107$大職業別)
+salary104$大職業別<-gsub("教育服務業","教育業",salary104$大職業別)
+salary104$大職業別<-gsub("醫療保健服務業","醫療保健業",salary104$大職業別)
+#join兩個資料
+salary<-full_join(salary104,salary107,"大職業別")
+colnames(salary)<-gsub(".x","104",colnames(salary))
+colnames(salary)<-gsub(".y","107",colnames(salary))
+colnames(salary)[13]<-"研究所-薪資104"
+colnames(salary)[14]<-"研究所-女/男104"
+colnames(salary)[26]<-"研究所-薪資107"
+colnames(salary)[27]<-"研究所-女/男107"
+salary$`大學-薪資104`<-gsub("—|…","",salary$`大學-薪資104`)
+salary$`大學-薪資107`<-gsub("—|…","",salary$`大學-薪資107`)
+knitr::kable(head(salary))
 ```
 
 ### 107年度薪資較104年度薪資高的職業有哪些? 
 ```{r compare103106}
-#這是R Code Chunk
+#新增大學畢業薪資提高比例欄位計算107年度大學畢業薪資 / 104年度大學畢業薪資
+salary$大學畢業薪資提高比例<-as.numeric(salary$`大學-薪資107`)/as.numeric(salary$`大學-薪資104`)
+#由大到小排序
+salary<-arrange(salary,desc(`大學畢業薪資提高比例`))
+#前十名的資料
+head(salary,10)
+##107年度的薪資/104年度的薪資>1，代表107年度的薪資比104年度還高，除了少部分小於1之外，薪資有增加的趨勢
 ```
 
 ### 提高超過5%的的職業有哪些? 
 ```{r over5}
-#這是R Code Chunk
+#篩選兩年度薪資比例 >1.05的欄位
+more_than_5_percent<-filter(salary,`大學畢業薪資提高比例`>1.05)
+more_than_5_percent$大職業別
+##提高超過5%的的職業如下圖
 ```
 
 ### 主要的職業種別是哪些種類呢?
 ```{r mainType}
-#這是R Code Chunk
+#取出大職業別中"-" 前面的字串
+
+more_than_5_percent$職業類別<-strsplit(more_than_5_percent$大職業別,"-")%>%
+  sapply("[",1)  
+#出現次數
+table(more_than_5_percent$職業類別)
+##總共有19種職業種類
+##出現53次
 ```
 
 ## 男女同工不同酬現況分析
@@ -36,11 +75,50 @@ library(dplyr)
 
 ### 104和107年度的大學畢業薪資資料，哪些行業男生薪資比女生薪資多?
 ```{r male}
-#這是R Code Chunk
+##將104和107年度大學-女/男薪資轉成numeric
+salary$`大學-女/男104`<-gsub("—|…","",salary$`大學-女/男104`)
+salary$`大學-女/男104`<-as.numeric(salary$`大學-女/男104`)
+salary$`大學-女/男107`<-gsub("—|…","",salary$`大學-女/男107`)
+salary$`大學-女/男107`<-as.numeric(salary$`大學-女/男107`)
+
+#將104年度大學畢業男女薪資比例由小到大排序並呈現前十名的資料
+salary[complete.cases(salary),]%>%
+  filter(`大學-女/男104`<100)%>%
+  arrange(`大學-女/男104`)%>%
+  select(大職業別,`大學-女/男104`)%>%
+  head(10)%>%
+  knitr::kable()
+##在104年度在機械設備操作及組裝人員類的工作女生薪資較明顯的少於男生
+
+#將107年度大學畢業男女薪資比例由小到大排序並呈現前十名的資料
+salary[complete.cases(salary),]%>%
+  filter(`大學-女/男107`<100)%>%
+  arrange(`大學-女/男107`)%>%
+  select(大職業別,`大學-女/男107`)%>%
+  head(10)%>%
+  knitr::kable()
+
+##在107年度男女薪資的比例有趨近相等，代表107年度女生薪資有上升的現象
 ```
 ### 哪些行業女生薪資比男生薪資多? 
 ```{r female}
-#這是R Code Chunk
+#將104年度大學畢業男女薪資比例由大到小排序並呈現前十名的資料
+salary[complete.cases(salary),]%>%
+  filter(`大學-女/男104`>100)%>%
+  arrange(desc(`大學-女/男104`))%>%
+  select(大職業別,`大學-女/男104`)%>%
+  head(10)%>%
+  knitr::kable()
+##在104年度，女生薪資比男生高的職業只有一個
+
+#將107年度大學畢業男女薪資比例由大到小排序並呈現前十名的資料
+salary[complete.cases(salary),]%>%
+  filter(`大學-女/男107`>100)%>%
+  arrange(desc(`大學-女/男107`))%>%
+  select(大職業別,`大學-女/男107`)%>%
+  head(10)%>%
+  knitr::kable()
+##在107年度女生薪資比男生薪資高的職業一個都沒有，甚至比104年還少，代表男女同工不同酬的問題並沒有改善
 ```
 
 ## 研究所薪資差異
@@ -48,18 +126,41 @@ library(dplyr)
 以107年度的資料來看，哪個職業別念研究所最划算呢 (研究所學歷薪資與大學學歷薪資增加比例最多)?
  
 ```{r grad}
-#這是R Code Chunk
+#以107年度的資料來看，取出大學薪資欄位與研究所薪資欄位
+salary2<-select(salary,大職業別,`大學-薪資107`,`研究所-薪資107`)
+#新增薪資差異比例欄位計算107年度研究所畢業薪資/107年度大學畢業薪資
+salary2$`研究所-薪資107`<-gsub("—|…","",salary2$`研究所-薪資107`)
+salary2$薪資差異比例<-as.numeric(salary2$`研究所-薪資107`)/as.numeric(salary2$`大學-薪資107`)
+#用薪資差異比例欄位由大到小排序並呈現前十名的資料
+arrange(salary2,desc(薪資差異比例))%>%
+  head(10)%>%
+  knitr::kable()
+##在其他服務業，研究所學歷薪資與大學學歷薪資增加比例最多，
 ```
 
 ## 我有興趣的職業別薪資狀況分析
 
 ### 有興趣的職業別篩選，呈現薪資
 ```{r like}
-#這是R Code Chunk
+#取出資訊及通訊傳播業相關欄位
+interest<-salary2[grepl("資訊及通訊傳播業",salary2$大職業別),]
+interest$`大學-薪資107`<-as.numeric(interest$`大學-薪資107`)
+interest$`研究所-薪資107`<-gsub("—|…","",interest$`研究所-薪資107`)
+interest$`研究所-薪資107`<-as.numeric(interest$`研究所-薪資107`)
+#取出金融及保險業相關欄位
+interest2<-salary2[grepl("金融及保險業",salary2$大職業別),]
+interest2$`大學-薪資107`<-as.numeric(interest2$`大學-薪資107`)
+interest2$`研究所-薪資107`<-gsub("—|…","",interest2$`研究所-薪資107`)
+interest2$`研究所-薪資107`<-as.numeric(interest2$`研究所-薪資107`)
+##以下兩種職業是我比較有興趣的
 ```
 
 ### 這些職業別研究所薪資與大學薪資差多少呢？
 ```{r likeGrad}
-#這是R Code Chunk
-```
+#呈現相對應的大學畢業薪資與研究所畢業薪資差異欄位
+interest$薪資差異<-interest$`研究所-薪資107`-interest$`大學-薪資107`
+interest2$薪資差異<-interest$`研究所-薪資107`-interest$`大學-薪資107`
+knitr::kable(interest)
+knitr::kable(interest2)
+##這兩種職業薪資與我想像中差不多，研究所畢業薪資約高於大學畢業薪資4000左右，但還是會選擇研究所，感覺對未來工作幫助比較大，也較容易升遷。
 

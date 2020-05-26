@@ -1,2 +1,108 @@
 library(jsonlite)
+install.packages("readr")
+install.packages("dplyr")
+library("readr")
 library(dplyr)
+#匯入資料
+salary104<-read_csv("http://ipgod.nchc.org.tw/dataset/b6f36b72-0c4a-4b60-9254-1904e180ddb1/resource/98d5094d-7481-44b5-876a-715a496f922c/download/a17000000j-020066-mah.csv")
+salary107<-read_csv("/Users/Mandy/Desktop/107年各教育程度別初任人員.csv")
+#把104和107資料裡職業名稱統一
+salary104$大職業別<-gsub("部門","",salary104$大職業別)
+salary104$大職業別<-gsub("、","_",salary104$大職業別)
+salary107$大職業別<-gsub("營建工程","營造業",salary107$大職業別)
+salary107$大職業別<-gsub("出版、影音製作、傳播及資通訊服務業","資訊及通訊傳播業",salary107$大職業別)
+salary104$大職業別<-gsub("教育服務業","教育業",salary104$大職業別)
+salary104$大職業別<-gsub("醫療保健服務業","醫療保健業",salary104$大職業別)
+#join兩個資料
+salary<-full_join(salary104,salary107,"大職業別")
+colnames(salary)<-gsub(".x","104",colnames(salary))
+colnames(salary)<-gsub(".y","107",colnames(salary))
+colnames(salary)[13]<-"研究所-薪資104"
+colnames(salary)[14]<-"研究所-女/男104"
+colnames(salary)[26]<-"研究所-薪資107"
+colnames(salary)[27]<-"研究所-女/男107"
+salary$`大學-薪資104`<-gsub("—|…","",salary$`大學-薪資104`)
+salary$`大學-薪資107`<-gsub("—|…","",salary$`大學-薪資107`)
+  
+###Q1
+#新增大學畢業薪資提高比例欄位計算107年度大學畢業薪資 / 104年度大學畢業薪資
+salary$大學畢業薪資提高比例<-as.numeric(salary$`大學-薪資107`)/as.numeric(salary$`大學-薪資104`)
+#由大到小排序
+salary<-arrange(salary,desc(`大學畢業薪資提高比例`))
+#前十名的資料
+head(salary,10)
+#篩選兩年度薪資比例 >1.05的欄位
+more_than_5_percent<-filter(salary,`大學畢業薪資提高比例`>1.05)
+#取出大職業別中"-" 前面的字串
+more_than_5_percent$大職業別
+more_than_5_percent$職業類別<-strsplit(more_than_5_percent$大職業別,"-")%>%
+  sapply("[",1)  
+#出現次數
+table(more_than_5_percent$職業類別)
+
+###Q2
+salary$`大學-女/男104`<-gsub("—|…","",salary$`大學-女/男104`)
+salary$`大學-女/男104`<-as.numeric(salary$`大學-女/男104`)
+salary$`大學-女/男107`<-gsub("—|…","",salary$`大學-女/男107`)
+salary$`大學-女/男107`<-as.numeric(salary$`大學-女/男107`)
+#將104年度大學畢業男女薪資比例由小到大排序並呈現前十名的資料
+install.packages("knitr")
+library(knitr)
+salary[complete.cases(salary),]%>%
+  filter(`大學-女/男104`<100)%>%
+  arrange(`大學-女/男104`)%>%
+  select(大職業別,`大學-女/男104`)%>%
+  head(10)%>%
+  knitr::kable()
+#將107年度大學畢業男女薪資比例由小到大排序並呈現前十名的資料
+salary[complete.cases(salary),]%>%
+  filter(`大學-女/男107`<100)%>%
+  arrange(`大學-女/男107`)%>%
+  select(大職業別,`大學-女/男107`)%>%
+  head(10)%>%
+  knitr::kable()
+#將104年度大學畢業男女薪資比例由大到小排序並呈現前十名的資料
+salary[complete.cases(salary),]%>%
+  filter(`大學-女/男104`>100)%>%
+  arrange(desc(`大學-女/男104`))%>%
+  select(大職業別,`大學-女/男104`)%>%
+  head(10)%>%
+  knitr::kable()
+##女生薪資比男生高
+#將107年度大學畢業男女薪資比例由大到小排序並呈現前十名的資料
+salary[complete.cases(salary),]%>%
+  filter(`大學-女/男107`>100)%>%
+  arrange(desc(`大學-女/男107`))%>%
+  select(大職業別,`大學-女/男107`)%>%
+  head(10)%>%
+  knitr::kable()
+
+###Q3
+#以107年度的資料來看，取出大學薪資欄位與研究所薪資欄位
+salary2<-select(salary,大職業別,`大學-薪資107`,`研究所-薪資107`)
+#新增薪資差異比例欄位計算107年度研究所畢業薪資/107年度大學畢業薪資
+salary$`研究所-薪資107`<-gsub("—|…","",salary$`研究所-薪資107`)
+salary2$薪資差異比例<-as.numeric(salary$`研究所-薪資107`)/as.numeric(salary$`研究所-薪資107`)
+#用薪資差異比例欄位由大到小排序並呈現前十名的資料
+arrange(salary2,desc(薪資差異比例))%>%
+  head(10)%>%
+  knitr::kable()
+
+###Q4
+#取出自己有興趣的職業別 
+#取出資訊及通訊傳播業相關欄位
+interest<-salary2[grepl("資訊及通訊傳播業",salary2$大職業別),]
+interest$`大學-薪資107`<-as.numeric(interest$`大學-薪資107`)
+interest$`研究所-薪資107`<-gsub("—|…","",interest$`研究所-薪資107`)
+interest$`研究所-薪資107`<-as.numeric(interest$`研究所-薪資107`)
+#取出金融及保險業相關欄位
+interest2<-salary2[grepl("金融及保險業",salary2$大職業別),]
+interest2$`大學-薪資107`<-as.numeric(interest2$`大學-薪資107`)
+interest2$`研究所-薪資107`<-gsub("—|…","",interest2$`研究所-薪資107`)
+interest2$`研究所-薪資107`<-as.numeric(interest2$`研究所-薪資107`)
+#呈現相對應的大學畢業薪資與研究所畢業薪資差異欄位
+interest$薪資差異<-interest$`研究所-薪資107`-interest$`大學-薪資107`
+interest2$薪資差異<-interest$`研究所-薪資107`-interest$`大學-薪資107`
+knitr::kable(interest)
+knitr::kable(interest2)
+
